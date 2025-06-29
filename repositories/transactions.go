@@ -5,6 +5,8 @@ import (
 	"backend-ewallet/utils"
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type TransactionRepository struct{}
@@ -55,3 +57,41 @@ func (r *TransactionRepository) UpdateTransactionStatus(transactionID int, statu
 	_, err = conn.Exec(context.Background(), query, args...)
 	return err
 }
+
+func (r *TransactionRepository) GetTransactionsByUserID(userID int, limit int) ([]models.Transaction, error) {
+	conn, err := utils.ConnectDB()
+	if err != nil {
+		return []models.Transaction{}, err
+	}
+	defer utils.CloseDB(conn)
+
+	query := `
+		SELECT transaction_id, sender_id, receiver_id, transaction_type, amount, fee,
+			description, reference_number, status, created_at, completed_at, category
+		FROM transactions 
+		WHERE sender_id = $1 OR receiver_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2`
+
+	rows, err := conn.Query(context.Background(), query, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []models.Transaction
+	for rows.Next() {
+		var tx models.Transaction
+		err := rows.Scan(
+			&tx.TransactionID, &tx.SenderID, &tx.ReceiverID, &tx.TransactionType,
+			&tx.Amount, &tx.Fee, &tx.Description, &tx.ReferenceNumber,
+			&tx.Status, &tx.CreatedAt, &tx.CompletedAt, &tx.Category)
+		if err != nil {
+			return nil, err
+		}
+		transactions = append(transactions, tx)
+	}
+
+	return transactions, nil
+}
+
