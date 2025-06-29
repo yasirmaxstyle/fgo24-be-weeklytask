@@ -5,6 +5,8 @@ import (
 	"backend-ewallet/utils"
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type UserRepository struct{}
@@ -22,14 +24,22 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 
 	query := `
 		INSERT INTO users (email, phone, full_name, password_hash, pin_hash, balance, 
-			registration_status, is_verified, created_at, updated_at, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			registration_status, created_at, updated_at, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING user_id`
 
 	err = conn.QueryRow(context.Background(), query,
-		user.Email, user.Phone, user.FullName, user.PasswordHash, user.PinHash,
-		user.Balance, user.RegistrationStatus, user.IsVerified, user.CreatedAt,
-		user.UpdatedAt, user.IsActive).Scan(&user.UserID)
+		user.Email,
+		user.Phone,
+		user.FullName,
+		user.PasswordHash,
+		user.PinHash,
+		user.Balance,
+		user.RegistrationStatus,
+		user.CreatedAt,
+		user.UpdatedAt,
+		user.IsActive).
+		Scan(&user.UserID)
 
 	return err
 }
@@ -43,20 +53,15 @@ func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
 
 	query := `
 		SELECT user_id, email, phone, full_name, password_hash, pin_hash, balance,
-			registration_status, is_verified, created_at, updated_at, last_login,
-			is_active, email_verification_token, phone_verification_token,
-			email_verified_at, phone_verified_at
+			registration_status, created_at, updated_at, last_login,
+			is_active
 		FROM users WHERE email = $1 AND is_active = true`
 
-	var user models.User
-	err = conn.QueryRow(context.Background(), query, email).Scan(
-		&user.UserID, &user.Email, &user.Phone, &user.FullName,
-		&user.PasswordHash, &user.PinHash, &user.Balance,
-		&user.RegistrationStatus, &user.IsVerified, &user.CreatedAt,
-		&user.UpdatedAt, &user.LastLogin, &user.IsActive,
-		&user.EmailVerificationToken, &user.PhoneVerificationToken,
-		&user.EmailVerifiedAt, &user.PhoneVerifiedAt)
-
+	row, err := conn.Query(context.Background(), query, email)
+	if err != nil {
+		return nil, err
+	}
+	user, err := pgx.CollectOneRow[models.User](row, pgx.RowToStructByName)
 	if err != nil {
 		return nil, err
 	}
@@ -73,20 +78,15 @@ func (r *UserRepository) GetUserByPhone(phone string) (*models.User, error) {
 
 	query := `
 		SELECT user_id, email, phone, full_name, password_hash, pin_hash, balance,
-			registration_status, is_verified, created_at, updated_at, last_login,
-			is_active, email_verification_token, phone_verification_token,
-			email_verified_at, phone_verified_at
+			registration_status, created_at, updated_at, last_login,
+			is_active
 		FROM users WHERE phone = $1 AND is_active = true`
 
-	var user models.User
-	err = conn.QueryRow(context.Background(), query, phone).Scan(
-		&user.UserID, &user.Email, &user.Phone, &user.FullName,
-		&user.PasswordHash, &user.PinHash, &user.Balance,
-		&user.RegistrationStatus, &user.IsVerified, &user.CreatedAt,
-		&user.UpdatedAt, &user.LastLogin, &user.IsActive,
-		&user.EmailVerificationToken, &user.PhoneVerificationToken,
-		&user.EmailVerifiedAt, &user.PhoneVerifiedAt)
-
+	row, err := conn.Query(context.Background(), query, phone)
+	if err != nil {
+		return nil, err
+	}
+	user, err := pgx.CollectOneRow[models.User](row, pgx.RowToStructByName)
 	if err != nil {
 		return nil, err
 	}
@@ -103,20 +103,15 @@ func (r *UserRepository) GetUserByID(userID int) (*models.User, error) {
 
 	query := `
 		SELECT user_id, email, phone, full_name, password_hash, pin_hash, balance,
-			registration_status, is_verified, created_at, updated_at, last_login,
-			is_active, email_verification_token, phone_verification_token,
-			email_verified_at, phone_verified_at
+			registration_status, created_at, updated_at, last_login,
+			is_active
 		FROM users WHERE user_id = $1 AND is_active = true`
 
-	var user models.User
-	err = conn.QueryRow(context.Background(), query, userID).Scan(
-		&user.UserID, &user.Email, &user.Phone, &user.FullName,
-		&user.PasswordHash, &user.PinHash, &user.Balance,
-		&user.RegistrationStatus, &user.IsVerified, &user.CreatedAt,
-		&user.UpdatedAt, &user.LastLogin, &user.IsActive,
-		&user.EmailVerificationToken, &user.PhoneVerificationToken,
-		&user.EmailVerifiedAt, &user.PhoneVerifiedAt)
-
+	row, err := conn.Query(context.Background(), query, userID)
+	if err != nil {
+		return nil, err
+	}
+	user, err := pgx.CollectOneRow[models.User](row, pgx.RowToStructByName)
 	if err != nil {
 		return nil, err
 	}
