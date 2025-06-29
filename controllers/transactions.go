@@ -116,11 +116,11 @@ func (ctrl *TransactionController) GetTransactionHistory(c *gin.Context) {
 		return
 	}
 
-	// Get limit from query parameter, default to 20
-	limitStr := c.DefaultQuery("limit", "20")
+	// Get limit from query parameter, default to 10
+	limitStr := c.DefaultQuery("limit", "10")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
-		limit = 20
+		limit = 10
 	}
 
 	transactions, err := ctrl.transactionRepo.GetTransactionsByUserID(userID.(int), limit)
