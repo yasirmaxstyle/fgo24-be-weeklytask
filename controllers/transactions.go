@@ -108,3 +108,29 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 		},
 	})
 }
+
+func (ctrl *TransactionController) GetTransactionHistory(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Get limit from query parameter, default to 20
+	limitStr := c.DefaultQuery("limit", "20")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 20
+	}
+
+	transactions, err := ctrl.transactionRepo.GetTransactionsByUserID(userID.(int), limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get transaction history"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Transaction history retrieved successfully",
+		"data":    transactions,
+	})
+}
