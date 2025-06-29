@@ -145,3 +145,30 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 		"data":    response,
 	})
 }
+
+func (ctrl *AuthController) GetProfile(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	user, err := ctrl.userRepo.GetUserByID(userID.(int))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	// Remove sensitive data
+	user.PasswordHash = ""
+	user.PinHash = ""
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Profile retrieved successfully",
+		"data":    user,
+	})
+}
