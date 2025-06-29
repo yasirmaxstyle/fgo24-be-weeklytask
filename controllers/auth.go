@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 )
 
 type AuthController struct {
@@ -92,6 +93,55 @@ func (ctrl *AuthController) Register(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "User registered successfully",
+		"data":    response,
+	})
+}
+
+func (ctrl *AuthController) Login(c *gin.Context) {
+	var req models.LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user by email
+	user, err := ctrl.userRepo.GetUserByEmail(req.Email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	// Check password
+	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+
+	// Update last login
+	ctrl.userRepo.UpdateLastLogin(user.UserID)
+
+	// Generate token
+	token, err := utils.GenerateToken(user.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	// Remove sensitive data
+	user.PasswordHash = ""
+	user.PinHash = ""
+
+	response := models.AuthResponse{
+		User:  *user,
+		Token: token,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Login successful",
 		"data":    response,
 	})
 }
