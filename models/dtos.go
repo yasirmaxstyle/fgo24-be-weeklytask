@@ -13,7 +13,14 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-type AuthResponse struct {
-	User  User   `json:"user"`
-	Token string `json:"token"`
+type TransferRequest struct {
+	ReceiverPhone string  `json:"receiver_phone" binding:"required"`
+	Amount        float64 `json:"amount" binding:"required,gt=0"`
+	Description   string  `json:"description"`
+	Pin           string  `json:"pin" binding:"required,len=6"`
+}
+
+type TopUpRequest struct {
+	Amount          float64 `json:"amount" binding:"required,gt=0"`
+	PaymentMethodID int     `json:"payment_method_id" binding:"required"`
 }
