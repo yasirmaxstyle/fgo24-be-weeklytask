@@ -14,12 +14,14 @@ type Transaction struct {
 	Status          string     `json:"status" db:"status"`
 	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
 	CompletedAt     *time.Time `json:"completed_at" db:"completed_at"`
-	Category        string     `json:"category" db:"category"`
 }
 
-type TransferRequest struct {
-	ReceiverPhone string  `json:"receiver_phone" binding:"required"`
-	Amount        float64 `json:"amount" binding:"required,gt=0"`
-	Description   string  `json:"description"`
-	Pin           string  `json:"pin" binding:"required,len=6"`
+type PaymentMethod struct {
+	MethodID      int     `json:"method_id" db:"method_id"`
+	MethodName    string  `json:"method_name" db:"method_name"`
+	MethodType    string  `json:"method_type" db:"method_type"`
+	IsActive      bool    `json:"is_active" db:"is_active"`
+	MinAmount     float64 `json:"min_amount" db:"min_amount"`
+	MaxAmount     float64 `json:"max_amount" db:"max_amount"`
+	FeePercentage float64 `json:"fee_percentage" db:"fee_percentage"`
 }
