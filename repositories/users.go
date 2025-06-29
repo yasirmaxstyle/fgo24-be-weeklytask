@@ -135,3 +135,15 @@ func (r *UserRepository) UpdateUserBalance(userID int, newBalance float64) error
 	_, err = conn.Exec(context.Background(), query, newBalance, time.Now(), userID)
 	return err
 }
+
+func (r *UserRepository) UpdateLastLogin(userID int) error {
+	conn, err := utils.ConnectDB()
+	if err != nil {
+		return err
+	}
+	defer utils.CloseDB(conn)
+
+	query := `UPDATE users SET last_login = $1 WHERE user_id = $2`
+	_, err = conn.Exec(context.Background(), query, time.Now(), userID)
+	return err
+}
