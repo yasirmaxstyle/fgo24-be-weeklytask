@@ -134,3 +134,24 @@ func (ctrl *TransactionController) GetTransactionHistory(c *gin.Context) {
 		"data":    transactions,
 	})
 }
+
+func (ctrl *TransactionController) GetBalance(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	user, err := ctrl.userRepo.GetUserByID(userID.(int))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get balance"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Balance retrieved successfully",
+		"data": gin.H{
+			"balance": user.Balance,
+		},
+	})
+}
