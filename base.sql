@@ -33,11 +33,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     transaction_id SERIAL PRIMARY KEY,
     sender_id INTEGER REFERENCES users (user_id) ON DELETE SET NULL,
     receiver_id INTEGER REFERENCES users (user_id) ON DELETE SET NULL,
+    method_id INTEGER NOT NULL REFERENCES payment_methods (method_id),
     transaction_type VARCHAR(50) NOT NULL CHECK (
-        transaction_type IN (
-            'transfer',
-            'topup'
-        )
+        transaction_type IN ('transfer', 'topup')
     ),
     amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
     fee DECIMAL(15, 2) DEFAULT 0.00 CHECK (fee >= 0),
@@ -73,7 +71,7 @@ CREATE TABLE IF NOT EXISTS payment_methods (
         method_type IN (
             'bank_transfer',
             'e_wallet',
-            'retail',
+            'retail'
         )
     ),
     is_active BOOLEAN DEFAULT TRUE,
@@ -83,7 +81,7 @@ CREATE TABLE IF NOT EXISTS payment_methods (
 );
 
 INSERT INTO
-    topup_methods (
+    payment_methods (
         method_name,
         method_type,
         min_amount,
