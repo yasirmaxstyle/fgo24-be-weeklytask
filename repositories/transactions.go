@@ -4,6 +4,7 @@ import (
 	"backend-ewallet/models"
 	"backend-ewallet/utils"
 	"context"
+	"time"
 )
 
 type TransactionRepository struct{}
@@ -30,5 +31,27 @@ func (r *TransactionRepository) CreateTransaction(tx *models.Transaction) error 
 		tx.Description, tx.ReferenceNumber, tx.Status, tx.CreatedAt,
 		tx.Category).Scan(&tx.TransactionID)
 
+	return err
+}
+
+func (r *TransactionRepository) UpdateTransactionStatus(transactionID int, status string) error {
+	conn, err := utils.ConnectDB()
+	if err != nil {
+		return err
+	}
+	defer utils.CloseDB(conn)
+
+	var query string
+	var args []interface{}
+
+	if status == "completed" {
+		query = `UPDATE transactions SET status = $1, completed_at = $2 WHERE transaction_id = $3`
+		args = []interface{}{status, time.Now(), transactionID}
+	} else {
+		query = `UPDATE transactions SET status = $1 WHERE transaction_id = $2`
+		args = []interface{}{status, transactionID}
+	}
+
+	_, err = conn.Exec(context.Background(), query, args...)
 	return err
 }
