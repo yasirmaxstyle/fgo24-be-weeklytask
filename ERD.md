@@ -41,7 +41,6 @@ direction LR
         string status
         datetime created_at
         datetime completed_at
-        string category
     }
 
     PAYMENT_METHODS {
