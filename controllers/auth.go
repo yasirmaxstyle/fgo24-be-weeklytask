@@ -31,27 +31,39 @@ func (ctrl *AuthController) Register(c *gin.Context) {
 	// Check if user already exists
 	existingUser, _ := ctrl.userRepo.GetUserByEmail(req.Email)
 	if existingUser != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "User with this email already exists"})
+		c.JSON(http.StatusConflict, models.APIResponse{
+			Success: false,
+			Error:   "User with this email already exists",
+		})
 		return
 	}
 
 	// Check if phone already exists
 	existingUser, _ = ctrl.userRepo.GetUserByPhone(req.Phone)
 	if existingUser != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "User with this phone already exists"})
+		c.JSON(http.StatusConflict, models.APIResponse{
+			Success: false,
+			Error:   "User with this phone number already exists",
+		})
 		return
 	}
 
 	// Hash password and PIN
 	passwordHash, err := utils.HashPassword(req.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Failed to hash password",
+		})
 		return
 	}
 
 	pinHash, err := utils.HashPassword(req.Pin)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash PIN"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Failed to hash PIN",
+		})
 		return
 	}
 
@@ -64,21 +76,16 @@ func (ctrl *AuthController) Register(c *gin.Context) {
 		PinHash:            pinHash,
 		Balance:            0.0,
 		RegistrationStatus: "completed",
-		IsVerified:         false,
 		CreatedAt:          time.Now(),
 		UpdatedAt:          time.Now(),
 		IsActive:           true,
 	}
 
 	if err := ctrl.userRepo.CreateUser(user); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
-		return
-	}
-
-	// Generate token
-	token, err := utils.GenerateToken(user.UserID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Failed to create user",
+		})
 		return
 	}
 
@@ -86,14 +93,10 @@ func (ctrl *AuthController) Register(c *gin.Context) {
 	user.PasswordHash = ""
 	user.PinHash = ""
 
-	response := models.AuthResponse{
-		User:  *user,
-		Token: token,
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "User registered successfully",
-		"data":    response,
+	c.JSON(http.StatusCreated, models.APIResponse{
+		Success: true,
+		Message: "User registered successfully",
+		Data:    user,
 	})
 }
 
@@ -108,16 +111,25 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 	user, err := ctrl.userRepo.GetUserByEmail(req.Email)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+			c.JSON(http.StatusUnauthorized, models.APIResponse{
+				Success: false,
+				Error:   "Invalid credentials",
+			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Database error",
+		})
 		return
 	}
 
 	// Check password
 	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		c.JSON(http.StatusUnauthorized, models.APIResponse{
+			Success: false,
+			Error:   "Invalid credentials",
+		})
 		return
 	}
 
@@ -127,22 +139,20 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 	// Generate token
 	token, err := utils.GenerateToken(user.UserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Failed to generate token",
+		})
 		return
 	}
 
-	// Remove sensitive data
-	user.PasswordHash = ""
-	user.PinHash = ""
-
-	response := models.AuthResponse{
-		User:  *user,
-		Token: token,
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Login successful",
-		"data":    response,
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: "Login successful",
+		Data: models.LoginResponse{
+			Token: token,
+			User:  *user,
+		},
 	})
 }
 
