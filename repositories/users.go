@@ -124,3 +124,14 @@ func (r *UserRepository) GetUserByID(userID int) (*models.User, error) {
 	return &user, nil
 }
 
+func (r *UserRepository) UpdateUserBalance(userID int, newBalance float64) error {
+	conn, err := utils.ConnectDB()
+	if err != nil {
+		return err
+	}
+	defer utils.CloseDB(conn)
+
+	query := `UPDATE users SET balance = $1, updated_at = $2 WHERE user_id = $3`
+	_, err = conn.Exec(context.Background(), query, newBalance, time.Now(), userID)
+	return err
+}
