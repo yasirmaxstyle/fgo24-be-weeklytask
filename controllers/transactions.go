@@ -26,26 +26,38 @@ func NewTransactionController() *TransactionController {
 func (ctrl *TransactionController) Transfer(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, models.APIResponse{
+			Success: false,
+			Message: "User not authenticated",
+		})
 		return
 	}
 
 	var req models.TransferRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
 	// Get sender user
 	sender, err := ctrl.userRepo.GetUserByID(userID.(int))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sender information"})
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Message: "Sender not found",
+		})
 		return
 	}
 
 	// Verify PIN
 	if !utils.CheckPasswordHash(req.Pin, sender.PinHash) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid PIN"})
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Message: "Invalid PIN",
+		})
 		return
 	}
 
@@ -53,16 +65,23 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 	receiver, err := ctrl.userRepo.GetUserByPhone(req.ReceiverPhone)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Receiver not found"})
+			c.JSON(http.StatusNotFound, models.APIResponse{
+				Success: false,
+				Message: "Receiver not found",
+			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get receiver information"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Message: "Failed to get receiver information"})
 		return
 	}
 
 	// Check if sender is trying to transfer to themselves
 	if sender.UserID == receiver.UserID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot transfer to yourself"})
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Message: "Cannot transfer to yourself"})
 		return
 	}
 
@@ -72,7 +91,10 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 
 	// Check sender balance
 	if sender.Balance < totalAmount {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient balance"})
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Message: "Insufficient balance",
+		})
 		return
 	}
 
@@ -80,9 +102,10 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 	referenceNumber := utils.GenerateReferenceNumber()
 
 	// Process transfer
-	err = ctrl.transactionRepo.ProcessTransfer(
+	res, err := ctrl.transactionRepo.ProcessTransfer(
 		sender.UserID,
 		receiver.UserID,
+		"TRANSFER",
 		req.Amount,
 		fee,
 		req.Description,
@@ -90,29 +113,33 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient balance"})
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Success: false,
+				Message: "Insufficient balance",
+			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transfer failed"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Message: "Transfer failed",
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Transfer successful",
-		"data": gin.H{
-			"reference_number": referenceNumber,
-			"amount":           req.Amount,
-			"fee":              fee,
-			"receiver_name":    receiver.FullName,
-			"receiver_phone":   receiver.Phone,
-		},
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: "Transfer successful",
+		Data:    res,
 	})
 }
 
 func (ctrl *TransactionController) GetTransactionHistory(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, models.APIResponse{
+			Success: false,
+			Message: "User not authenticated",
+		})
 		return
 	}
 
@@ -125,7 +152,10 @@ func (ctrl *TransactionController) GetTransactionHistory(c *gin.Context) {
 
 	transactions, err := ctrl.transactionRepo.GetTransactionsByUserID(userID.(int), limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get transaction history"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Message: "Failed to get transaction history",
+		})
 		return
 	}
 
@@ -138,19 +168,26 @@ func (ctrl *TransactionController) GetTransactionHistory(c *gin.Context) {
 func (ctrl *TransactionController) GetBalance(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, models.APIResponse{
+			Success: false,
+			Message: "User not authenticated",
+		})
 		return
 	}
 
 	user, err := ctrl.userRepo.GetUserByID(userID.(int))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get balance"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Message: "Failed to get balance",
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Balance retrieved successfully",
-		"data": gin.H{
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: false,
+		Message: "Balance retrieved successfully",
+		Data: gin.H{
 			"balance": user.Balance,
 		},
 	})
