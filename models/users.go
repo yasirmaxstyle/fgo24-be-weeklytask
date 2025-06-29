@@ -13,15 +13,10 @@ type User struct {
 	PinHash                string     `json:"-" db:"pin_hash"`
 	Balance                float64    `json:"balance" db:"balance"`
 	RegistrationStatus     string     `json:"registration_status" db:"registration_status"`
-	IsVerified             bool       `json:"is_verified" db:"is_verified"`
 	CreatedAt              time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt              time.Time  `json:"updated_at" db:"updated_at"`
 	LastLogin              *time.Time `json:"last_login" db:"last_login"`
 	IsActive               bool       `json:"is_active" db:"is_active"`
-	EmailVerificationToken string     `json:"-" db:"email_verification_token"`
-	PhoneVerificationToken string     `json:"-" db:"phone_verification_token"`
-	EmailVerifiedAt        *time.Time `json:"email_verified_at" db:"email_verified_at"`
-	PhoneVerifiedAt        *time.Time `json:"phone_verified_at" db:"phone_verified_at"`
 }
 
 type Contact struct {
