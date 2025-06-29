@@ -27,3 +27,19 @@ func GenerateToken(userID int) (string, error) {
 	return tokenString, err
 }
 
+func ValidateToken(tokenString string) (int, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		userID := int(claims["user_id"].(float64))
+		return userID, nil
+	}
+
+	return 0, jwt.ErrInvalidKey
+}
