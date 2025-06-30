@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     transaction_id SERIAL PRIMARY KEY,
     sender_id INTEGER REFERENCES users (user_id) ON DELETE SET NULL,
     receiver_id INTEGER REFERENCES users (user_id) ON DELETE SET NULL,
-    method_id INTEGER NOT NULL REFERENCES payment_methods (method_id),
+    method_id INTEGER REFERENCES payment_methods (method_id),
     transaction_type VARCHAR(50) NOT NULL CHECK (
         transaction_type IN ('transfer', 'topup')
     ),
