@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"backend-ewallet/models"
-	"backend-ewallet/repositories"
 	"backend-ewallet/utils"
 	"net/http"
 	"strconv"
@@ -12,18 +11,18 @@ import (
 )
 
 type TransactionController struct {
-	userRepo        *repositories.UserRepository
-	transactionRepo *repositories.TransactionRepository
+	userRepo        *models.UserRepository
+	transactionRepo *models.TransactionRepository
 }
 
 func NewTransactionController() *TransactionController {
 	return &TransactionController{
-		userRepo:        repositories.NewUserRepository(),
-		transactionRepo: repositories.NewTransactionRepository(),
+		userRepo:        models.NewUserRepository(),
+		transactionRepo: models.NewTransactionRepository(),
 	}
 }
 
-func (ctrl *TransactionController) Transfer(c *gin.Context) {
+func (tc *TransactionController) Transfer(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, models.APIResponse{
@@ -34,7 +33,7 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 	}
 
 	var req models.TransferRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.APIResponse{
 			Success: false,
 			Message: err.Error(),
@@ -42,8 +41,7 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 		return
 	}
 
-	// Get sender user
-	sender, err := ctrl.userRepo.GetUserByID(userID.(int))
+	sender, err := tc.userRepo.GetUserByID(userID.(int))
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.APIResponse{
 			Success: false,
@@ -52,7 +50,6 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 		return
 	}
 
-	// Verify PIN
 	if !utils.CheckPasswordHash(req.Pin, sender.PinHash) {
 		c.JSON(http.StatusBadRequest, models.APIResponse{
 			Success: false,
@@ -61,8 +58,7 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 		return
 	}
 
-	// Get receiver by phone
-	receiver, err := ctrl.userRepo.GetUserByPhone(req.ReceiverPhone)
+	receiver, err := tc.userRepo.GetUserByPhone(req.ReceiverPhone)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			c.JSON(http.StatusNotFound, models.APIResponse{
@@ -77,7 +73,6 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 		return
 	}
 
-	// Check if sender is trying to transfer to themselves
 	if sender.UserID == receiver.UserID {
 		c.JSON(http.StatusBadRequest, models.APIResponse{
 			Success: false,
@@ -85,11 +80,9 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 		return
 	}
 
-	// Calculate fee (simple 1% fee)
 	fee := req.Amount * 0.01
 	totalAmount := req.Amount + fee
 
-	// Check sender balance
 	if sender.Balance < totalAmount {
 		c.JSON(http.StatusBadRequest, models.APIResponse{
 			Success: false,
@@ -98,18 +91,17 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 		return
 	}
 
-	// Generate reference number
 	referenceNumber := utils.GenerateReferenceNumber()
 
-	// Process transfer
-	res, err := ctrl.transactionRepo.ProcessTransfer(
+	res, err := tc.transactionRepo.ProcessTransfer(
 		sender.UserID,
 		receiver.UserID,
-		"TRANSFER",
+		"transfer",
 		req.Amount,
 		fee,
 		req.Description,
 		referenceNumber,
+		"completed",
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -133,7 +125,7 @@ func (ctrl *TransactionController) Transfer(c *gin.Context) {
 	})
 }
 
-func (ctrl *TransactionController) GetTransactionHistory(c *gin.Context) {
+func (tc *TransactionController) GetTransactionHistory(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, models.APIResponse{
@@ -143,14 +135,14 @@ func (ctrl *TransactionController) GetTransactionHistory(c *gin.Context) {
 		return
 	}
 
-	// Get limit from query parameter, default to 10
+	// default limit 10 / page
 	limitStr := c.DefaultQuery("limit", "10")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
 		limit = 10
 	}
 
-	transactions, err := ctrl.transactionRepo.GetTransactionsByUserID(userID.(int), limit)
+	transactions, err := tc.transactionRepo.GetTransactionsByUserID(userID.(int), limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
@@ -165,7 +157,7 @@ func (ctrl *TransactionController) GetTransactionHistory(c *gin.Context) {
 	})
 }
 
-func (ctrl *TransactionController) GetBalance(c *gin.Context) {
+func (tc *TransactionController) GetBalance(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, models.APIResponse{
@@ -175,7 +167,7 @@ func (ctrl *TransactionController) GetBalance(c *gin.Context) {
 		return
 	}
 
-	user, err := ctrl.userRepo.GetUserByID(userID.(int))
+	user, err := tc.userRepo.GetUserByID(userID.(int))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
@@ -190,5 +182,98 @@ func (ctrl *TransactionController) GetBalance(c *gin.Context) {
 		Data: gin.H{
 			"balance": user.Balance,
 		},
+	})
+}
+
+func (tc *TransactionController) Topup(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.APIResponse{
+			Success: false,
+			Error:   "User not authenticated",
+		})
+		return
+	}
+
+	var req models.TopUpRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	user, err := tc.userRepo.GetUserByID(userID.(int))
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "User not found",
+		})
+		return
+	}
+
+	paymentMethod, err := tc.transactionRepo.GetPaymentMethodByID(req.PaymentMethodID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "Invalid payment method",
+		})
+		return
+	}
+
+	if req.Amount < paymentMethod.MinAmount || req.Amount > paymentMethod.MaxAmount {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "Amount not within allowed range",
+		})
+		return
+	}
+
+	fee := req.Amount * paymentMethod.FeePercentage / 100
+
+	transaction := &models.Transaction{
+		ReceiverID:      &user.UserID,
+		TransactionType: "topup",
+		PaymentMethodID: &req.PaymentMethodID,
+		Amount:          req.Amount,
+		Fee:             fee,
+		Description:     "Top up via " + paymentMethod.MethodName,
+		ReferenceNumber: utils.GenerateReferenceNumber(),
+		Status:          "completed",
+	}
+
+	if err := tc.transactionRepo.CreateTransaction(transaction); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Failed to create transaction",
+		})
+		return
+	}
+
+	// Update user balance
+	newBalance := user.Balance + req.Amount
+	if err := tc.userRepo.UpdateUserBalance(user.UserID, newBalance); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Failed to update balance",
+		})
+		return
+	}
+
+	response := models.TransactionResponse{
+		TransactionID:   transaction.TransactionID,
+		TransactionType: transaction.TransactionType,
+		Amount:          req.Amount,
+		Fee:             fee,
+		ReferenceNumber: transaction.ReferenceNumber,
+		Status:          "COMPLETED",
+		NewBalance:      newBalance,
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: "Top up successful",
+		Data:    response,
 	})
 }
