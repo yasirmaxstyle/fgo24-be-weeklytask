@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"backend-ewallet/models"
-	"backend-ewallet/repositories"
 	"backend-ewallet/utils"
 	"net/http"
 	"time"
@@ -12,19 +11,22 @@ import (
 )
 
 type AuthController struct {
-	userRepo *repositories.UserRepository
+	userRepo *models.UserRepository
 }
 
 func NewAuthController() *AuthController {
 	return &AuthController{
-		userRepo: repositories.NewUserRepository(),
+		userRepo: models.NewUserRepository(),
 	}
 }
 
 func (ctrl *AuthController) Register(c *gin.Context) {
 	var req models.RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
 		return
 	}
 
@@ -102,8 +104,11 @@ func (ctrl *AuthController) Register(c *gin.Context) {
 
 func (ctrl *AuthController) Login(c *gin.Context) {
 	var req models.LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
 		return
 	}
 
@@ -159,17 +164,26 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 func (ctrl *AuthController) GetProfile(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, models.APIResponse{
+			Success: false,
+			Error:   "User not authenticated",
+		})
 		return
 	}
 
 	user, err := ctrl.userRepo.GetUserByID(userID.(int))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.JSON(http.StatusNotFound, models.APIResponse{
+				Success: false,
+				Error:   "User not found",
+			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "Database error",
+		})
 		return
 	}
 
@@ -177,8 +191,9 @@ func (ctrl *AuthController) GetProfile(c *gin.Context) {
 	user.PasswordHash = ""
 	user.PinHash = ""
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Profile retrieved successfully",
-		"data":    user,
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: "Profile retrieved successfully",
+		Data:    user,
 	})
 }
